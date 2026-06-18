@@ -206,7 +206,7 @@ router.post('/elevenlabs', (_req: Request, res: Response) => {
 
   const apiKey = process.env.ELEVENLABS_API_KEY ?? '';
   const wsUrl = apiKey
-    ? `wss://api.elevenlabs.io/v1/convai/twilio?agent_id=${agentId}&xi_api_key=${apiKey}`
+    ? `wss://api.elevenlabs.io/v1/convai/twilio?agent_id=${agentId}&amp;xi_api_key=${apiKey}`
     : `wss://api.elevenlabs.io/v1/convai/twilio?agent_id=${agentId}`;
 
   res.set('Content-Type', 'text/xml');
