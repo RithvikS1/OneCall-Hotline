@@ -204,13 +204,17 @@ router.post('/elevenlabs', (_req: Request, res: Response) => {
 
   console.log(`[Voice] Forwarding call to ElevenLabs agent: ${agentId}`);
 
-  // ElevenLabs Twilio streaming integration
+  const apiKey = process.env.ELEVENLABS_API_KEY ?? '';
+  const wsUrl = apiKey
+    ? `wss://api.elevenlabs.io/v1/convai/twilio?agent_id=${agentId}&xi_api_key=${apiKey}`
+    : `wss://api.elevenlabs.io/v1/convai/twilio?agent_id=${agentId}`;
+
   res.set('Content-Type', 'text/xml');
   res.send(
     `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
   <Connect>
-    <Stream url="wss://api.elevenlabs.io/v1/convai/twilio?agent_id=${agentId}" />
+    <Stream url="${wsUrl}" />
   </Connect>
 </Response>`
   );
