@@ -1,7 +1,10 @@
 import express from 'express';
+import path from 'path';
+import fs from 'fs';
 import voiceRouter from './routes/voice';
 import smsRouter from './routes/sms';
 import elevenLabsRouter from './routes/elevenlabs';
+import impactRouter from './routes/impact';
 import { classifyNeed, extractZip } from './lib/ai';
 import { searchLiveResources } from './lib/search';
 import { extractResources } from './lib/resourceExtractor';
@@ -105,11 +108,40 @@ app.post('/test', async (req, res) => {
   }
 });
 
+app.use('/api', impactRouter);
 app.use('/voice', voiceRouter);
 app.use('/sms', smsRouter);
 app.use('/elevenlabs', elevenLabsRouter);
 
-// Catch-all for unknown routes
+const clientDist = path.join(__dirname, '..', 'client', 'dist');
+const hasClientBuild = fs.existsSync(path.join(clientDist, 'index.html'));
+
+if (hasClientBuild) {
+  app.use(express.static(clientDist));
+  app.use((req, res, next) => {
+    if (req.method !== 'GET' && req.method !== 'HEAD') return next();
+    if (
+      req.path.startsWith('/api') ||
+      req.path.startsWith('/voice') ||
+      req.path.startsWith('/sms') ||
+      req.path.startsWith('/elevenlabs') ||
+      req.path === '/health' ||
+      req.path === '/test'
+    ) {
+      return next();
+    }
+    res.sendFile(path.join(clientDist, 'index.html'));
+  });
+} else {
+  app.get('/', (_req, res) => {
+    res.status(503).json({
+      error: 'Landing page not built',
+      hint: 'Run npm run build:client from the project root, then restart the server.',
+    });
+  });
+}
+
+// Catch-all for unknown API routes
 app.use((_req, res) => {
   res.status(404).json({ error: 'Not found' });
 });
