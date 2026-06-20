@@ -9,6 +9,7 @@ import {
   Home,
   Scale,
   Users,
+  Zap,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import type { CategoryBreakdown } from '../types/impact';
@@ -24,6 +25,7 @@ const ICONS: Record<string, LucideIcon> = {
   education: GraduationCap,
   employment: Briefcase,
   mental_health: HeartHandshake,
+  utilities: Zap,
   other: HelpCircle,
 };
 

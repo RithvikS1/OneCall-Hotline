@@ -100,6 +100,7 @@ const CATEGORY_META: Record<string, { label: string; description: string }> = {
   education: { label: 'Education', description: 'Schools, training, GED' },
   employment: { label: 'Employment', description: 'Job training, workforce programs' },
   mental_health: { label: 'Mental health', description: 'Counseling, wellness (non-crisis)' },
+  utilities: { label: 'Utilities assistance', description: 'Electric, gas, water bills' },
   emergency: { label: 'Emergency routing', description: 'Directed to 911' },
   crisis: { label: 'Crisis routing', description: 'Directed to 988' },
   other: { label: 'Other local needs', description: 'Community resources near you' },
@@ -107,7 +108,7 @@ const CATEGORY_META: Record<string, { label: string; description: string }> = {
 
 const ALL_PUBLIC_CATEGORIES = [
   'housing', 'food', 'healthcare', 'benefits', 'transportation', 'legal',
-  'family', 'education', 'employment', 'mental_health', 'other',
+  'family', 'education', 'employment', 'mental_health', 'utilities', 'other',
 ] as const;
 
 const OUTCOME_LABELS: Record<string, string> = {
