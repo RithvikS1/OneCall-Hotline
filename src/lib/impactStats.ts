@@ -186,18 +186,23 @@ function buildActivityLabel(category: string | null, status: string | null): str
 export async function getImpactStats(): Promise<ImpactStats> {
   const [
     sessionsResult,
-    elevenLabsResult,
     referralsResult,
     sessionsDataResult,
+    elevenLabsDataResult,
     recentSessionsResult,
     recentReferralsResult,
+    recentElevenLabsResult,
   ] = await Promise.all([
     supabase.from('call_sessions').select('id', { count: 'exact', head: true }),
-    supabase.from('elevenlabs_sessions').select('id', { count: 'exact', head: true }),
     supabase.from('referrals').select('id', { count: 'exact', head: true }),
     supabase
       .from('call_sessions')
       .select('id, status, detected_category, zip_code, created_at, updated_at, twilio_call_sid')
+      .order('created_at', { ascending: false })
+      .limit(5000),
+    supabase
+      .from('elevenlabs_sessions')
+      .select('id, status, detected_category, zip_code, created_at, updated_at')
       .order('created_at', { ascending: false })
       .limit(5000),
     supabase
@@ -211,6 +216,12 @@ export async function getImpactStats(): Promise<ImpactStats> {
       .select('created_at, call_session_id')
       .order('created_at', { ascending: false })
       .limit(15),
+    supabase
+      .from('elevenlabs_sessions')
+      .select('detected_category, zip_code, status, created_at')
+      .in('status', ['resources_sent', 'no_results'])
+      .order('created_at', { ascending: false })
+      .limit(15),
   ]);
 
   if (sessionsResult.error) throw sessionsResult.error;
@@ -218,8 +229,12 @@ export async function getImpactStats(): Promise<ImpactStats> {
   if (sessionsDataResult.error) throw sessionsDataResult.error;
 
   const sessions = sessionsDataResult.data ?? [];
+  const elevenLabsSessions = (elevenLabsDataResult.error ? [] : (elevenLabsDataResult.data ?? []))
+    .map(s => ({ ...s, twilio_call_sid: null as string | null }));
+  const allSessions = [...sessions, ...elevenLabsSessions];
+
   const callSessionCount = sessionsResult.count ?? 0;
-  const elevenLabsCount = elevenLabsResult.error ? 0 : (elevenLabsResult.count ?? 0);
+  const elevenLabsCount = elevenLabsSessions.length;
   const callsAssisted = callSessionCount + elevenLabsCount;
   const resourcesShared = referralsResult.count ?? 0;
 
@@ -240,7 +255,7 @@ export async function getImpactStats(): Promise<ImpactStats> {
   let callsThisWeek = 0;
   let callsLastWeek = 0;
 
-  for (const row of sessions) {
+  for (const row of allSessions) {
     const state = zipToState(row.zip_code);
     if (state && state !== 'Armed Forces') {
       stateSet.add(state);
@@ -257,7 +272,9 @@ export async function getImpactStats(): Promise<ImpactStats> {
       outcomeMap.set(row.status, (outcomeMap.get(row.status) ?? 0) + 1);
     }
 
-    const channel = row.twilio_call_sid?.startsWith('sms-') ? 'sms' : 'voice';
+    const channel = row.twilio_call_sid == null ? 'elevenlabs'
+      : row.twilio_call_sid.startsWith('sms-') ? 'sms'
+      : 'voice';
     channelMap.set(channel, (channelMap.get(channel) ?? 0) + 1);
 
     const created = new Date(row.created_at);
@@ -273,7 +290,7 @@ export async function getImpactStats(): Promise<ImpactStats> {
   const statesReached = stateSet.size > 0 ? stateSet.size : null;
 
   // TODO: Replace proxy with real call duration once Twilio CallDuration or ended_at is stored.
-  const completedSessions = sessions.filter((s) => s.status === 'resources_sent' && s.updated_at && s.created_at);
+  const completedSessions = allSessions.filter((s) => s.status === 'resources_sent' && s.updated_at && s.created_at);
   let avgGuidanceTimeSeconds: number | null = null;
   if (completedSessions.length >= 3) {
     const totalSeconds = completedSessions.reduce((sum, s) => {
@@ -283,7 +300,7 @@ export async function getImpactStats(): Promise<ImpactStats> {
     avgGuidanceTimeSeconds = Math.round(totalSeconds / completedSessions.length);
   }
 
-  const matchSessions = sessions.filter((s) =>
+  const matchSessions = allSessions.filter((s) =>
     (MATCH_STATUSES as readonly string[]).includes(s.status ?? '')
   );
   const resourcesSentCount = matchSessions.filter((s) => s.status === 'resources_sent').length;
@@ -302,11 +319,9 @@ export async function getImpactStats(): Promise<ImpactStats> {
     countsByDate.set(formatDateKey(d.toISOString()), 0);
   }
 
-  for (const row of sessions) {
+  for (const row of allSessions) {
     const key = formatDateKey(row.created_at);
-    if (countsByDate.has(key)) {
-      countsByDate.set(key, (countsByDate.get(key) ?? 0) + 1);
-    }
+    if (countsByDate.has(key)) countsByDate.set(key, (countsByDate.get(key) ?? 0) + 1);
   }
 
   const callsOverTime: CallsOverTimePoint[] = Array.from(countsByDate.entries())
@@ -320,7 +335,10 @@ export async function getImpactStats(): Promise<ImpactStats> {
     resourcesByDate.set(formatDateKey(d.toISOString()), 0);
   }
 
-  const recentSessions = recentSessionsResult.data ?? [];
+  const recentSessions = [
+    ...(recentSessionsResult.data ?? []),
+    ...(recentElevenLabsResult.error ? [] : (recentElevenLabsResult.data ?? [])),
+  ];
 
   const sessionCategoryById = new Map(
     sessions.map((s) => [s.id, { category: s.detected_category, zip: s.zip_code, status: s.status }])
@@ -418,6 +436,7 @@ export async function getImpactStats(): Promise<ImpactStats> {
   const channelBreakdown = [
     { channel: 'voice', label: 'Phone calls', count: channelMap.get('voice') ?? 0 },
     { channel: 'sms', label: 'Text messages', count: channelMap.get('sms') ?? 0 },
+    { channel: 'elevenlabs', label: 'AI voice calls', count: channelMap.get('elevenlabs') ?? 0 },
   ].filter((c) => c.count > 0);
 
   const resourcesOverTime: CallsOverTimePoint[] = Array.from(resourcesByDate.entries())

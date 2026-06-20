@@ -114,7 +114,7 @@ export async function saveSearchResults(
 
 export async function saveReferrals(
   callerId: string,
-  callSessionId: string,
+  callSessionId: string | null,
   resources: Array<{
     title: string;
     url: string;
@@ -215,16 +215,32 @@ export async function getLastResources(callerId: string): Promise<LastResource[]
   return (data ?? []) as LastResource[];
 }
 
-export async function createElevenLabsSession(callerId: string, conversationId?: string) {
+export async function createElevenLabsSession(callerId: string, params?: {
+  conversationId?: string | null;
+  detectedCategory?: string | null;
+  zipCode?: string | null;
+  fromPhone?: string | null;
+}) {
   const { data, error } = await supabase
     .from('elevenlabs_sessions')
     .insert({
       caller_id: callerId,
-      elevenlabs_conversation_id: conversationId ?? null,
+      elevenlabs_conversation_id: params?.conversationId ?? null,
       status: 'active',
+      detected_category: params?.detectedCategory ?? null,
+      zip_code: params?.zipCode ?? null,
+      from_phone: params?.fromPhone ?? null,
     })
     .select()
     .single();
   if (error) console.error('[DB] createElevenLabsSession failed:', error.message);
   return data;
+}
+
+export async function updateElevenLabsSession(id: string, updates: Record<string, unknown>) {
+  const { error } = await supabase
+    .from('elevenlabs_sessions')
+    .update({ ...updates, updated_at: new Date().toISOString() })
+    .eq('id', id);
+  if (error) console.error('[DB] updateElevenLabsSession failed:', error.message);
 }

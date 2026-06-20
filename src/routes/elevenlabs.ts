@@ -11,6 +11,7 @@ import {
   getLastResources,
   saveReferrals,
   createElevenLabsSession,
+  updateElevenLabsSession,
 } from '../lib/supabase';
 
 const router = Router();
@@ -67,12 +68,17 @@ router.post('/tools/search-resources', async (req: Request, res: Response) => {
 
   try {
     const caller = await upsertCaller(callerPhone, zip);
-    const elSession = await createElevenLabsSession(caller.id);
+    const elSession = await createElevenLabsSession(caller.id, {
+      detectedCategory: category,
+      zipCode: zip,
+      fromPhone: callerPhone,
+    });
 
     const searchResults = await searchLiveResources(category, zip);
 
     if (searchResults.length === 0) {
       console.log(`[ElevenLabs] search-resources: no results for ${category} / ${zip}`);
+      if (elSession) await updateElevenLabsSession(elSession.id, { status: 'no_results' });
       const fallback = buildSpokenResourceList([], category, zip);
       res.json({ resources: [], spokenSummary: fallback });
       return;
@@ -92,15 +98,15 @@ router.post('/tools/search-resources', async (req: Request, res: Response) => {
 
     console.log(`[ElevenLabs] returned resources: ${formatted.map(r => r.name).join(', ')}`);
 
-    // Persist for get-last-resources followups
     await saveLastResources(caller.id, category, zip, formatted);
 
-    // Save referrals to DB
     await saveReferrals(
       caller.id,
-      elSession?.id ?? 'elevenlabs-' + Date.now(),
+      null,
       formatted.map(r => ({ title: r.name, url: r.url, phone: r.phone, address: r.address }))
     ).catch((e: Error) => console.error('[DB] saveReferrals failed:', e.message));
+
+    if (elSession) await updateElevenLabsSession(elSession.id, { status: 'resources_sent' });
 
     const spokenSummary = buildSpokenResourceList(formatted, category, zip);
 
