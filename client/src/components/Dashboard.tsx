@@ -1,4 +1,4 @@
-import { Activity, BarChart3, Clock, MapPinned, Phone, Share2, Target, TrendingUp } from 'lucide-react';
+import { Activity, BarChart3, Clock, MapPinned, Phone, Share2, Target, TrendingUp, Users, CalendarDays, Building2, MapPin } from 'lucide-react';
 import {
   Area,
   AreaChart,
@@ -123,8 +123,20 @@ export function Dashboard({
         )}
 
         {/* Insight cards */}
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {[
+            {
+              icon: CalendarDays,
+              label: 'Calls today',
+              value: loading ? '—' : stats?.callsToday ?? 0,
+              sub: `${loading ? '—' : stats?.callsThisWeek ?? 0} this week`,
+            },
+            {
+              icon: Users,
+              label: 'Unique callers',
+              value: loading ? '—' : stats?.uniqueCallers ?? '—',
+              sub: 'people reached',
+            },
             {
               icon: TrendingUp,
               label: 'Week over week',
@@ -141,7 +153,7 @@ export function Dashboard({
               icon: Clock,
               label: 'Guidance time',
               value: loading ? '—' : guidanceTime ?? '—',
-              sub: 'average',
+              sub: 'average per call',
             },
             {
               icon: Target,
@@ -363,6 +375,90 @@ export function Dashboard({
             ))}
           </div>
         )}
+
+        {/* Top resources + most served communities */}
+        <div className="grid gap-8 lg:grid-cols-2">
+          {/* Top resources connected */}
+          <div className="section-card p-6 sm:p-8">
+            <div className="mb-1 flex items-center gap-2">
+              <Building2 className="h-5 w-5 text-teal-brand" />
+              <h3 className="text-lg font-semibold text-stone-900">Top resources connected</h3>
+            </div>
+            <p className="mb-6 text-xs text-stone-500">Organizations most often shared with callers</p>
+            {loading ? (
+              <div className="space-y-3">
+                {Array.from({ length: 5 }).map((_, i) => (
+                  <div key={i} className="h-9 animate-pulse rounded-lg bg-stone-100" />
+                ))}
+              </div>
+            ) : !stats?.topResources.length ? (
+              <ChartEmpty message="No resource data yet." />
+            ) : (
+              <ol className="space-y-3">
+                {stats.topResources.map((r, i) => {
+                  const maxCount = stats.topResources[0].count;
+                  const pct = Math.round((r.count / maxCount) * 100);
+                  return (
+                    <li key={r.title} className="flex flex-col gap-1">
+                      <div className="flex items-baseline justify-between gap-2">
+                        <span className="truncate text-sm font-medium text-stone-800">
+                          <span className="mr-2 text-xs text-stone-400">#{i + 1}</span>
+                          {r.title}
+                        </span>
+                        <span className="shrink-0 text-xs font-semibold tabular-nums text-teal-brand">
+                          {r.count}
+                        </span>
+                      </div>
+                      <div className="h-1.5 w-full overflow-hidden rounded-full bg-stone-100">
+                        <div
+                          className="h-full rounded-full bg-teal-brand transition-all"
+                          style={{ width: `${pct}%` }}
+                        />
+                      </div>
+                      {r.phone && (
+                        <p className="text-xs text-stone-400">{r.phone}</p>
+                      )}
+                    </li>
+                  );
+                })}
+              </ol>
+            )}
+          </div>
+
+          {/* Most served communities */}
+          <div className="section-card p-6 sm:p-8">
+            <div className="mb-1 flex items-center gap-2">
+              <MapPin className="h-5 w-5 text-teal-brand" />
+              <h3 className="text-lg font-semibold text-stone-900">Most served communities</h3>
+            </div>
+            <p className="mb-6 text-xs text-stone-500">ZIP codes with the most activity (anonymous)</p>
+            {loading ? (
+              <div className="grid grid-cols-2 gap-3">
+                {Array.from({ length: 6 }).map((_, i) => (
+                  <div key={i} className="h-16 animate-pulse rounded-xl bg-stone-100" />
+                ))}
+              </div>
+            ) : !stats?.topZipCodes.length ? (
+              <ChartEmpty message="No location data yet." />
+            ) : (
+              <div className="grid grid-cols-2 gap-3">
+                {stats.topZipCodes.map((z, i) => (
+                  <div
+                    key={z.zip}
+                    className="flex flex-col gap-0.5 rounded-xl border border-stone-100 bg-stone-50 px-4 py-3"
+                  >
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-xs text-stone-400">#{i + 1}</span>
+                      <span className="font-mono text-base font-semibold text-stone-900">{z.zip}</span>
+                    </div>
+                    <p className="text-xs text-stone-500">{z.state}</p>
+                    <p className="text-xs font-medium text-teal-brand">{z.count} {z.count === 1 ? 'call' : 'calls'}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
 
         {/* Activity feed */}
         <div className="section-card p-6 sm:p-8">

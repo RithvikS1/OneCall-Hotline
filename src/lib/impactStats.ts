@@ -192,6 +192,7 @@ export async function getImpactStats(): Promise<ImpactStats> {
     recentSessionsResult,
     recentReferralsResult,
     recentElevenLabsResult,
+    callersResult,
   ] = await Promise.all([
     supabase.from('call_sessions').select('id', { count: 'exact', head: true }),
     supabase.from('referrals').select('id', { count: 'exact', head: true }),
@@ -222,6 +223,7 @@ export async function getImpactStats(): Promise<ImpactStats> {
       .in('status', ['resources_sent', 'no_results'])
       .order('created_at', { ascending: false })
       .limit(15),
+    supabase.from('callers').select('id', { count: 'exact', head: true }),
   ]);
 
   if (sessionsResult.error) throw sessionsResult.error;
@@ -388,7 +390,7 @@ export async function getImpactStats(): Promise<ImpactStats> {
   // Attribute referrals to states via session lookup
   const { data: allReferrals } = await supabase
     .from('referrals')
-    .select('call_session_id, created_at')
+    .select('call_session_id, created_at, resource_title, resource_phone')
     .limit(5000);
 
   for (const ref of allReferrals ?? []) {
@@ -447,8 +449,34 @@ export async function getImpactStats(): Promise<ImpactStats> {
   const avgResourcesPerCall =
     matchedCalls >= 3 ? Math.round((resourcesShared / matchedCalls) * 10) / 10 : null;
 
+  const resourceTitleMap = new Map<string, { count: number; phone: string | null }>();
+  for (const ref of allReferrals ?? []) {
+    if (!ref.resource_title) continue;
+    const existing = resourceTitleMap.get(ref.resource_title) ?? { count: 0, phone: null };
+    existing.count += 1;
+    if (!existing.phone && ref.resource_phone) existing.phone = ref.resource_phone;
+    resourceTitleMap.set(ref.resource_title, existing);
+  }
+  const topResources = Array.from(resourceTitleMap.entries())
+    .map(([title, data]) => ({ title, ...data }))
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 8);
+
+  const zipCountMap = new Map<string, number>();
+  for (const row of allSessions) {
+    if (row.zip_code) zipCountMap.set(row.zip_code, (zipCountMap.get(row.zip_code) ?? 0) + 1);
+  }
+  const topZipCodes = Array.from(zipCountMap.entries())
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 6)
+    .map(([zip, count]) => ({ zip, state: zipToState(zip) ?? 'Unknown', count }));
+
+  const uniqueCallers = callersResult.error ? null : (callersResult.count ?? null);
+
   const twilioPhone = process.env.TWILIO_PHONE_NUMBER ?? null;
-  const lastCallAt = sessions.length > 0 ? sessions[0].created_at : null;
+  const lastCallAt = allSessions.length > 0
+    ? allSessions.reduce((a, b) => a.created_at > b.created_at ? a : b).created_at
+    : null;
 
   return {
     callsAssisted,
@@ -474,5 +502,8 @@ export async function getImpactStats(): Promise<ImpactStats> {
     recentActivity,
     lastCallAt,
     updatedAt: new Date().toISOString(),
+    uniqueCallers,
+    topResources,
+    topZipCodes,
   };
 }
