@@ -5,9 +5,9 @@
   "scripts": {
     "dev": "nodemon --watch src --ext ts --exec \"ts-node -r ./register.js src/server.ts\"",
     "dev:client": "npm run dev --prefix client",
-    "build": "tsc",
+    "build": "tsc && npm run build --prefix client",
     "build:client": "npm run build --prefix client",
-    "build:all": "npm run build && npm run build:client",
+    "build:all": "tsc && npm run build --prefix client",
     "start": "node -r ./register.js dist/server.js"
   },
   "keywords": [],
