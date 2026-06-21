@@ -51,6 +51,18 @@ export interface CategoryBreakdown {
   count: number;
 }
 
+export interface TopResource {
+  title: string;
+  count: number;
+  phone: string | null;
+}
+
+export interface TopZipCode {
+  zip: string;
+  state: string;
+  count: number;
+}
+
 export interface ImpactStats {
   callsAssisted: number;
   resourcesShared: number;
@@ -75,6 +87,9 @@ export interface ImpactStats {
   recentActivity: ActivityEntry[];
   lastCallAt: string | null;
   updatedAt: string;
+  uniqueCallers: number | null;
+  topResources: TopResource[];
+  topZipCodes: TopZipCode[];
 }
 
 const CATEGORY_LABELS: Record<string, string> = {
